@@ -1,0 +1,76 @@
+#!/bin/bash
+#The original ISCSI target script by Lee Tobin 
+#Edited on 25/07/2014 by Basmah Alnasser
+
+#Export the evidence drive
+CONFIGFS=/sys/kernel/config
+TARGET=/sys/kernel/config/target/core
+FABRIC=/sys/kernel/config/target/iscsi
+DEF_IQN="iqn.2003-01.org.linux-iscsi.target.i686:sn.e475ed6fcdd0"
+
+if  ( ls -la /sys/block | grep usb | grep -qo sd. ) 
+   then
+	 USBev=$( ls -la /sys/block | grep usb | grep -o sd.| uniq | tail -9 )
+         
+	#List all the USBs and make the user to choose one of them
+             
+	 	i=1   
+		for Upath in /dev/$USBev ; do
+			dev=$( basename "$Upath" )
+			devices[$i]=${dev}
+			vendor=$( cat /sys/block/"$dev"/device/vendor)
+			size=$(blockdev --getsize64 /dev/$dev)
+			echo  " $i Usb Name:$vendor  Device:$dev  Size:$size Bytes " 
+			i=$(( i+1 ))
+		done
+
+		#chech for the input validation	 
+	    	while  [[ ! "$usbNo"  =~ ^[0-9]+$ ]] ||  [[  "$usbNo"  -gt  ${#devices[@]}  ||  "$usbNo" -eq 0 ]] ; do
+        		read -p "Choose a USB device ?   " usbNo
+               		Upath="${devices[$usbNo]}"
+		done 
+					
+		if  [ -d $FABRIC/$DEF_IQN/tpgt_1/enable ] && [ grep -q "1" $FABRIC/$DEF_IQN/tpgt_1/enable ] ; then 
+		
+		rm -rf $FABRIC/$DEF_IQN/tpgt_1/lun/lun_0
+		rm -rf $FABRIC/$DEF_IQN/tpgt_1/np/192.168.0.1:3260
+		rm -rf $FABRIC/$DEF_IQN/tpgt_1
+		rm -rf $TARGET/iblock_0/lvm_test0
+		rm -rf $TARGET/iblock_0
+		
+		else
+		
+                #create a IBLOCK HBA and virtual storage object
+		mkdir -p $TARGET/iblock_0/lvm_test0
+		# Tell the virtual storage object what struct block_device we want
+		echo "udev_path=/dev/$Upath" > $TARGET/iblock_0/lvm_test0/control # Export USB device $Upath  
+		echo "readonly=1" > $TARGET/iblock_0/lvm_test0/control
+		# Enable the virtual storage object and call bd_claim()
+		echo 1 > $TARGET/iblock_0/lvm_test0/enable
+
+		#create the network portal on $DEF_IQN/tpgt_1
+		mkdir -p "$FABRIC/$DEF_IQN/tpgt_1/np/192.168.0.1:3260"
+		# Create LUN 0 on $DEF_IQN/tpgt_1
+		mkdir -p "$FABRIC/$DEF_IQN/tpgt_1/lun/lun_0"
+		# Create the iSCSI Target Port Mapping for $DEF_IN/tpgt_1 LUN 0
+		# to lvm_test0 and give it the port symbolic name of lio_west_port
+		ln -s $TARGET/iblock_0/lvm_test0 "$FABRIC/$DEF_IQN/tpgt_1/lun/lun_0/lio_west_port"
+
+		# Allow iSCSI Initiators to login to $DEF_IQN/tpgt_1
+		#warning Currently uses generate_node_acls=1,cache_dynamic_acls=1,demo_mode_lun_access=1
+		echo 1 > $FABRIC/$DEF_IQN/tpgt_1/enable
+		#this is needed or else the target will require the initiators iqn
+		echo 0 > $FABRIC/$DEF_IQN/tpgt_1/attrib/authentication
+		echo 1 > $FABRIC/$DEF_IQN/tpgt_1/attrib/cache_dynamic_acls
+		echo 1 > $FABRIC/$DEF_IQN/tpgt_1/attrib/generate_node_acls
+		echo ""		
+		echo "The USB device has been exported"
+		sleep 3
+ 		fi
+else
+    echo "There is no USB device found "
+    sleep 1
+fi
+
+	
+ 

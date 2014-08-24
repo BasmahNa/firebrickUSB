@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>FIREBrick</title>
+	<meta name="description" content="">
+	<meta name="author" content="Lee Tobin">
+	
+	<!-- Mobile Specific Metas -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" /> 
+
+	<!-- CSS -->
+	
+	<link rel="stylesheet" href="css/topcoat-desktop-light.css">
+	<link rel="stylesheet" href="css/firebrick.css">
+	<link rel="stylesheet" href="css/pikaday.css">
+	<link rel="stylesheet" href="css/pgwmodal.css">
+	
+	<!-- JS -->
+	<script src="js/zepto.min.js"></script>
+	<script src="js/pikaday.js"></script>
+	<!-- Progress -->
+	<script src="js/fx.js"></script>
+	<script src="js/zprogress.js"></script>
+	<!-- Progress end -->
+	<script src="js/pgwmodal.min.js"></script>
+
+	<!-- Favicons -->
+	<link rel="icon"  type="image/ico"   href="favicon.ico">
+	<link rel="shortcut icon" href="images/favicon.ico">
+   
+</head>
+<body>
+
+<div style="padding-left:100px;padding-bottom:30px; height:80px;position:relative;">
+	<img style="position:absolute;left:0px;top:10px;" src="css/back.png" > 
+	<h1 style="position:absolute; left:90px;top:46px;margin:0px;letter-spacing:4px;">FIREBrick</h1> 
+	<p style="position:absolute;left:113px;top:70px;font-size:12px;">Open source forensic platform</p>
+</div>
+
+
+<article id="radio-button" class="component">
+	<header>
+		<h2>Evidence</h2>
+	</header>
+
+	iSCSI target
+	<label class="topcoat-switch">
+		<input id="exportiscsi" type="checkbox" class="topcoat-switch__input">
+		<div class="topcoat-switch__toggle"></div>
+	</label>
+	<span id="exportiscsiNote" class="topcoat-notification" style="display:none;"></span>
+</article>	
+
+
+<article id="radio-button" class="component">
+	<header>
+		<h2>Admin</h2>
+	</header>
+
+	
+	<p>Set date/time <input type="text" id="datepicker" style="width:360px"></p>
+	<p><button id="button_poweroff" class="topcoat-button">Power off</button></p>
+</article>
+
+<article  class="component">
+	<header>
+		<h2>USB Write Blocker</h2>
+	</header>
+ 
+	<p><button id="button_writeProtect" class="topcoat-button" >Protect/Unprotect</button></p>
+	<div id="WriteBlockerMessages";"></div>
+       	<p>
+
+	<form  name="form_writeProtect" id="form_writeProtect" method="POST" action="cgi-bin/UsbWriteBlocker.cgi" style="display:none;">
+	<input type="text" id="inputData">
+	</form>
+        
+        </p>
+
+
+
+</article>
+
+<article  class="component">
+	<header>
+		<h2>USB Imaging and verification</h2>
+	</header>
+ 
+	<p><button id="button_Imaging" class="topcoat-button">Image and verification</button></p>
+	<span id="ImagingMessages" class="topcoat-notification" style="display:none;"></span>
+</article>
+
+<script>
+
+Zepto(function($){
+
+
+
+	//Click handlers
+
+	$('#button_poweroff').on('click', function(e){ 
+		$.ajax({
+		  type: 'GET',
+		  url: 'cgi-bin/poweroff.cgi'
+		});
+		$.pgwModal({content: 'The FIREBrick is now off.'});
+	});
+
+	$('#exportiscsi').on('click', function(e){
+		$.ajax({
+			type: 'GET',
+			url: 'cgi-bin/evidenceExport.cgi',
+			success: function(data){   
+				console.log(data);
+				if(data.substring(0,4) != "done"){					
+					$('#exportiscsiNote').html(data).show();
+					$('#exportiscsi').prop("checked",false);
+				}
+				else $('#exportiscsiNote').hide();
+
+			}
+		});
+	});
+
+
+	//check if exported
+	$.ajax({
+		type: 'GET',
+		url: 'cgi-bin/evidenceCheckDisk.cgi',
+		success: function(data){   
+			console.log(data);
+			if(data.substring(0,3) == "exp"){
+				$('#exportiscsi').prop("checked",true);
+			}
+			else $('#exportiscsi').prop("checked",false);
+
+		}
+	});
+
+		$('#button_poweroff').on('click', function(e){ 
+		$.ajax({
+		  type: 'GET',
+		  url: 'cgi-bin/poweroff.cgi'
+		});
+		$.pgwModal({content: 'The FIREBrick is now off.'});
+	});
+
+
+
+$('#button_writeProtect').on('click', function(e){
+	$.ajax({
+		type: 'GET',
+		url: 'cgi-bin/getUSBList.cgi',  	
+		//dataType: "html",
+		success: function(response){
+			$('#WriteBlockerMessages').html(response);
+			$(".usb_list").each(function(index,value){
+				$(value).attr("onclick", "mount(this); return false;");
+			});
+				$('#form_writeProtect').show();
+	  
+			}});
+		})
+function mount(device) {
+	var r = confirm("Continue to mount this USB as read-only?");
+	if (r == true) {
+	    $.ajax({
+		type: 'GET',
+		data: { deviceName: device.id} ,
+		url: 'cgi-bin/mountUSB.cgi',  	
+		//dataType: "html",
+		success: function(response){
+			alert("response:"+response);
+		  
+		}});	
+	} 
+}
+
+	//Picker
+    	var picker = new Pikaday({ field: document.getElementById('datepicker'),
+		showTime: true,
+		use24hour: true,
+		onSelect: function(date) {
+			//update the time
+			console.log(picker.getDate());
+			//date --set="2 OCT 2006 18:00:00"
+		}
+	});
+	picker.setDate(new Date());	
+	
+		
+	
+	//Progress
+	//$.zprogress.start();
+	//$.zprogress.set(0.4);
+	//$.zprogress.done();
+	$(document).on('ajaxStart', $.zprogress.start).on('ajaxStop', $.zprogress.done);
+	
+
+
+
+});
+
+</script>
+
+</body>
+</html>
