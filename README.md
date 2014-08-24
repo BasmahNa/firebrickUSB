@@ -12,6 +12,9 @@ Software for the open source hardware write-blocker/imager.
 * Free, open source firmware
 * Can be fully customized to the needs of specific departments
 * Automatic RAID storage detection
+* USB Write-Bloker
+* USB acuistion 
+* USB ISCSI target
 
 To build a FIREBrick you need:
 
